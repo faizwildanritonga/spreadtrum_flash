@@ -1311,9 +1311,9 @@ rloop:
 				}
 			}
 			char dfile[40];
-			if (isdigit(str2[2][0])) snprintf(dfile, sizeof(dfile), "%s", gPartInfo.name);
-			else if (in_loop) snprintf(dfile, sizeof(dfile), "%s", list[loop_count]);
-			else snprintf(dfile, sizeof(dfile), "%s", name);
+			if (isdigit(str2[2][0])) snprintf(dfile, sizeof(dfile), "%s.bin", gPartInfo.name);
+			else if (in_loop) snprintf(dfile, sizeof(dfile), "%s.bin", list[loop_count]);
+			else snprintf(dfile, sizeof(dfile), "%s.bin", name);
 			dump_partition(io, gPartInfo.name, 0, gPartInfo.size, dfile, blk_size ? blk_size : DEFAULT_BLK_SIZE);
 			if (loop_count) { name = list[--loop_count]; goto rloop; }
 			argc -= 2; argv += 2;
