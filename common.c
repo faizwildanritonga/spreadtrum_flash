@@ -821,33 +821,29 @@ uint8_t *loadfile(const char *fn, size_t *num, size_t extra) {
 	return buf;
 }
 
-void send_buf(spdio_t *io,
-	uint32_t start_addr, int end_data,
-	unsigned step, uint8_t *mem, unsigned size) {
-	uint32_t i, n;
-	uint32_t *data = (uint32_t *)io->temp_buf;
-	WRITE32_BE(data, start_addr);
-	WRITE32_BE(data + 1, size);
+// Tambahkan global di atas send_buf:
+static uint32_t g_force_declare_size = 0; // set via env/arg jika perlu
 
-	encode_msg_nocpy(io, BSL_CMD_START_DATA, 4 * 2);
-	if (send_and_check(io)) exit(1);
-	for (i = 0; i < size; i += n) {
-		n = size - i;
-		// n = spd_transcode_max(mem + i, size - i, 2048 - 2 - 6);
-		if (n > step) n = step;
-		encode_msg(io, BSL_CMD_MIDST_DATA, mem + i, n);
-		send_msg(io);
-		int ret = recv_msg(io);
-		if (ret) {
-			if ((ret = recv_type(io)) != BSL_REP_ACK) DBG_LOG("unexpected response (0x%04x)\n", ret);
-		}
-		else if (i + n == size) return;
-		else ERR_EXIT("timeout reached\n");
-	}
-	if (end_data) {
-		encode_msg_nocpy(io, BSL_CMD_END_DATA, 0);
-		send_and_check(io);
-	}
+void send_buf(spdio_t *io, uint32_t start_addr, int end_data,
+              unsigned step, uint8_t *mem, unsigned size) {
+    uint32_t i, n;
+    uint32_t *data = (uint32_t *)io->temp_buf;
+    uint32_t declared = g_force_declare_size ? g_force_declare_size : size;
+
+    WRITE32_BE(data, start_addr);
+    WRITE32_BE(data + 1, declared);   // <-- size yang DIUMUMKAN ke POSTROM
+    encode_msg_nocpy(io, BSL_CMD_START_DATA, 4 * 2);
+    if (send_and_check(io)) exit(1);
+    for (i = 0; i < size; i += n) {   // <-- tapi yang dikirim tetap 'size' byte
+        n = size - i;
+        if (n > step) n = step;
+        encode_msg(io, BSL_CMD_MIDST_DATA, mem + i, n);
+        if (send_and_check(io)) exit(1);
+    }
+    if (end_data) {
+        encode_msg_nocpy(io, BSL_CMD_END_DATA, 0);
+        send_and_check(io);
+    }
 }
 
 size_t send_file(spdio_t *io, const char *fn,
