@@ -1482,7 +1482,8 @@ void erase_partition(spdio_t *io, const char *name) {
 }
 
 // fn must be full
-void load_partition(spdio_t *io, const char *name,
+// name: partition name sent to device, disp_name: name shown in log
+static void load_partition_impl(spdio_t *io, const char *name, const char *disp_name,
 	const char *fn, unsigned step) {
 	uint64_t offset, len, n64;
 	unsigned mode64, n, step0 = step; int ret;
@@ -1502,7 +1503,7 @@ void load_partition(spdio_t *io, const char *name,
 	len = ftello(fi);
 	fseek(fi, 0, SEEK_SET);
 	DBG_LOG("file size : 0x%llx\n", (long long)len);
-	DBG_LOG("Start to write partition %s, ", name);
+	DBG_LOG("Start to write partition %s, ", disp_name);
 	DBG_LOG("type CTRL + C to cancel...\n");
 	void (*old_handler)(int);
 	old_handler = signal(SIGINT, signal_handler);
@@ -1555,7 +1556,7 @@ void load_partition(spdio_t *io, const char *name,
 			if (is_simg) ret = recv_msg_timeout(io, 100000);
 			else ret = recv_msg_timeout(io, 15000);
 			if (!ret) {
-				if (n == n64) ERR_EXIT("signature verification of \"%s\" failed or timeout reached\n", name);
+				if (n == n64) ERR_EXIT("signature verification of \"%s\" failed or timeout reached\n", disp_name);
 				else ERR_EXIT("timeout reached\n");
 			}
 			if ((ret = recv_type(io)) != BSL_REP_ACK) {
@@ -1578,7 +1579,7 @@ fallback_load:
 			if (is_simg) ret = recv_msg_timeout(io, 100000);
 			else ret = recv_msg_timeout(io, 15000);
 			if (!ret) {
-				if (n == n64) ERR_EXIT("signature verification of \"%s\" failed or timeout reached\n", name);
+				if (n == n64) ERR_EXIT("signature verification of \"%s\" failed or timeout reached\n", disp_name);
 				else ERR_EXIT("timeout reached\n");
 			}
 			if ((ret = recv_type(io)) != BSL_REP_ACK) {
@@ -1592,7 +1593,13 @@ fallback_load:
 	signal(SIGINT, old_handler);
 	encode_msg_nocpy(io, BSL_CMD_END_DATA, 0);
 	if (!send_and_check(io)) DBG_LOG("\nWrite Part Done: %s, target: 0x%llx, written: 0x%llx\n",
-		name, (long long)len, (long long)offset);
+		disp_name, (long long)len, (long long)offset);
+}
+
+// fn must be full
+void load_partition(spdio_t *io, const char *name,
+	const char *fn, unsigned step) {
+	load_partition_impl(io, name, name, fn, step);
 }
 
 // fn must be full
@@ -1637,7 +1644,7 @@ void load_partition_force(spdio_t *io, const int id, const char *fn, unsigned st
 	}
 	encode_msg_nocpy(io, BSL_CMD_REPARTITION, io->part_count * 0x4c);
 	if (send_and_check(io)) { g_w_force = 0; return; } //repart failed
-	load_partition(io, name, fn, step);
+	load_partition_impl(io, name, part_name, fn, step);
 	buf = io->temp_buf;
 	for (i = 0; i < io->part_count; i++) {
 		memset(buf, 0, 36 * 2);
